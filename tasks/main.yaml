@@ -1,0 +1,14 @@
+---
+
+# NOTE: before it run the imported SLB HTTP Content Routing task, it will run the dependency
+# role first, which is the fad_slb_real_server_pool role.
+
+# will invoke tasks inside the file named 'fad_slb_content_routing.yaml'
+- name: Create/update SLB HTTP Content Routing entries.
+  tags: [fad_slb_content_routing]
+  ansible.builtin.import_tasks: fad_slb_content_routing.yaml
+
+# will invoke tasks inside the file named 'fad_slb_content_routing_rule.yaml'
+- name: Create/update SLB HTTP Content Routing Member entries.
+  tags: [fad_slb_content_routing_condition]
+  ansible.builtin.import_tasks: fad_slb_content_routing_condition.yaml

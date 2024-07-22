@@ -1,0 +1,9 @@
+---
+
+fad_vdom: root
+
+# load-balance real-server
+fad_slb_real_servers: []
+
+# load-balance real-server-pool
+fad_slb_real_server_pools: []

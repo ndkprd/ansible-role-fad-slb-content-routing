@@ -1,0 +1,148 @@
+---
+
+# Gather existing entries facts by using HTTP GET Request against the
+# FAD SLB Content Routing Condition endpoint, and then register the result into the
+# 'fad_slb_content_routing_condition_get_results' var. Failed when the HTTP return code
+# is anything other than 200 or 302.
+- name: Gather FAD SLB Content Routing Condition facts for create task.
+  ansible.builtin.uri:
+    method: GET
+    url: "{{ fad_api_endpoint.slb_content_routing }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: route_condition_gather_results
+  failed_when: "route_condition_gather_results.status not in [200, 302]"
+  tags: [get]
+
+# Will print out the value of the collected facts registered from the
+# previous task.
+- name: Debug out FAD SLB Content Routing Condition gathered facts.
+  ansible.builtin.debug:
+    msg: "{{ route_condition_gather_results.json.payload }}"
+  tags: [debug]
+
+# - name: Debug out create condition.
+  # vars:
+  #   existing_route_conditions: "{{ route_condition_gather_results.json.payload }}"
+  #   query: "[?mkey=='%s'].match[].content | [0]"
+  # ansible.builtin.debug:
+  #   msg: "{{ existing_route_conditions | json_query(query % route.0.name) }}"
+  # loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
+  # loop_control:
+  #   loop_var: cr
+  #   label: "{{  route.1.content }} ) -> {{  route.0.name }}"
+  # tags: [debug]
+
+# This task will check if our desired entries in our vars already exist or not
+# in the previously gathered fact. If yes, then that entry will be skipped.
+# If not exist, that entry will be created.
+- name: Add FAD SLB Content Routing Condition entry if not exist.
+  vars:
+    existing_route_conditions: "{{ route_condition_gather_results.json.payload }}"
+    query: "[?mkey=='%s'].match[].content"
+  ansible.builtin.uri:
+    method: POST
+    url: "{{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    body: >
+      {
+        "content": "{{ route.1.content | string }}",
+        "ignorecase": "{{ route.1.ignorecase | default('enable') | string }}",
+        "object": "{{ route.1.object | default('http-host-header') | string }}",
+        "reverse": "{{ route.1.reverse | default('disable') | string }}",
+        "type": "{{ route.1.type | default('string') }}"
+      }
+  register: route_condition_create_results
+  loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
+  loop_control:
+    loop_var: route
+    label: "{{  route.1.content }} ) -> {{  route.0.name }}"
+  when: >
+     route.1.content | string not in existing_route_conditions | json_query('[?mkey==`' +  route.0.name + '`].match[].content')
+  changed_when: "route_condition_create_results.json.payload == 0"
+  failed_when: "route_condition_create_results.json.payload not in [0, -15]"
+  tags: [post]
+
+# Re-gather existing entries facts to prepare for update tasks.
+- name: Re-gather FAD SLB Content Routing Condition facts for update task.
+  ansible.builtin.uri:
+    method: GET
+    url: "{{ fad_api_endpoint.slb_content_routing }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: route_condition_regather_results
+  failed_when: "route_condition_regather_results.status not in [200, 302]"
+  tags: [get]
+
+- name: Debug out FAD SLB Content Routing Condition re-gathered facts.
+  ansible.builtin.debug:
+    msg: "{{ route_condition_regather_results.json.payload }}"
+  tags: [debug]
+
+# For each loop, it will check if there's any entry that needs to be updated. Those entry will be
+# updated with the new data if there's a difference between the gathered facts and our desired
+# configuration in the vars.
+- name: Update FAD SLB Content Routing Condition entry if entry exists and needs update.
+  vars:
+    current_route_condition_facts: "{{ route_condition_regather_results.json.payload }}"
+    query: "[?mkey=='%s'].match | [0] | [?content == '%s'].%s | [0]"
+  ansible.builtin.uri:
+    method: PUT
+    url: >
+      {{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name }}&mkey={{
+      current_route_condition_facts | json_query(query % (route.0.name, route.1.content,
+      'mkey')) }}
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    body: >
+      {
+        "content": "{{ route.1.content | string }}",
+        "ignorecase": "{{ route.1.ignorecase | default('enable') | string }}",
+        "object": "{{ route.1.object | default('http-host-header') | string }}",
+        "reverse": "{{ route.1.reverse | default('disable') | string }}",
+        "type": "{{ route.1.type | default('string') }}"
+      }
+  register: route_condition_update_results
+  loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
+  loop_control:
+    loop_var: route
+    label: "{{ route.1.content }} -> {{ route.0.name }}"
+  changed_when: "route_condition_update_results.json.payload == 0"
+  failed_when: "route_condition_update_results.json.payload not in [0, -15]"
+  when: >
+    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'content')) !=
+      route.1.content | string) or
+    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'ignorecase')) !=
+      route.1.ignorecase | default('enable') | string) or
+    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'object')) !=
+      route.1.object | default('http-host-header') | string) or
+    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'reverse')) !=
+      route.1.reverse | default('disable') | string) or
+    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'type')) !=
+      route.1.type | default('string') | string)
+  tags: [put]
+
+# Final re-gather and print out for debugging purpose, will be skipped if you skip 'debug' tag.
+- name: Debug out FAD SLB Content Routing Condition final value after update task.
+  ansible.builtin.debug:
+    msg: >
+      {{ (lookup('url', fad_api_endpoint.slb_content_routing_condition + '&pkey=' + route.name,
+      validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
+  loop: "{{ fad_slb_content_routings }}"
+  loop_control:
+    loop_var: route
+    label: "{{ route.name }}"
+  tags: [debug, get]

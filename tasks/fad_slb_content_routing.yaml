@@ -1,0 +1,169 @@
+---
+
+# Gather existing entries facts by using HTTP GET Request against the
+# FAD SLB HTTP Content Routing endpoint, and then register the result into the
+# 'fad_slb_content_routing_get_results' var. Failed when the HTTP return code
+# is anything other than 200 or 302.
+- name: Gather FAD SLB Content Routing facts for create task.
+  ansible.builtin.uri:
+    method: GET
+    url: "{{ fad_api_endpoint.slb_content_routing }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: route_gather_results
+  failed_when: "route_gather_results.status not in [200, 302]"
+  tags: [get]
+
+# Will print out the value of the collected facts registered from the
+# previous task.
+- name: Debug out FAD SLB Content Routing gathered facts.
+  ansible.builtin.debug:
+    msg: "{{ route_gather_results.json.payload }}"
+  tags: [debug]
+
+# This task will check if our desired entries in our vars already exist or not
+# in the previously gathered fact. If yes, then that entry will be skipped.
+# If not exist, that entry will be created.
+- name: Add FAD SLB Content Routing entry if not exist.
+  vars:
+    existing_routes: "{{ route_gather_results.json.payload | json_query('[].mkey') }}"
+  ansible.builtin.uri:
+    method: POST
+    url: "{{ fad_api_endpoint.slb_content_routing }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    body: >
+      {
+        "comments": "{{ route.comments | default('') | string }}",
+        "connection-pool": "{{ route.connection_pool | default('') | string }}",
+        "connection_pool_inherit": "{{ route.connection_pool_inherit | default('enable') | string }}",
+        "ip": "{{ route.ip | default('0.0.0.0') | string }}",
+        "ip6": "{{ route.ip6 | default('::') | string }}",
+        "method": "{{ route.method | default('') | string }}",
+        "method_inherit": "{{ route.method_inherit | default('enable') | string }}",
+        "mkey": "{{ route.name | string }}",
+        "packet-fwd-method": "{{ route.packet_fwd_method | default('inherit') | string }}",
+        "persistence": "{{ route.persistence | default('') | string }}",
+        "persistence_inherit": "{{ route.persistence_inherit | default('enable') | string }}",
+        "pool": "{{ route.pool | string }}",
+        "schedule-list": "{{ route.schedule_list | default('disable') | string }}",
+        "schedule-pool-list": "{{ route.schedule_pool_list | default('') | string }}",
+        "source-pool-list": "{{ route.source_pool_list | default('') | string }}",
+        "type": "{{ route.type | default('l7-content-routing') | string }}"
+      }
+  register: route_create_results
+  loop: "{{ fad_slb_content_routings }}"
+  loop_control:
+    loop_var: route
+    label: "{{ route.name }}"
+  when: >
+    route.name not in existing_routes
+  changed_when: "route_create_results.json.payload == 0"
+  failed_when: "route_create_results.json.payload not in [0, -15]"
+  tags: [post]
+
+# Re-gather existing entries facts to prepare for update tasks.
+- name: Re-gather FAD SLB Content Routing facts for update task.
+  ansible.builtin.uri:
+    method: GET
+    url: "{{ fad_api_endpoint.slb_content_routing }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: route_regather_results
+  failed_when: "route_regather_results.status not in [200, 302]"
+  tags: [get]
+
+# Will print out the value of the re-gathered entries.
+- name: Debug out FAD SLB Content Routing re-gathered facts.
+  ansible.builtin.debug:
+    msg: "{{ route_regather_results.json.payload }}"
+  tags: [debug]
+
+# For each loop, it will check if there's any entry that needs to be updated.
+# Those entry will be updated with the new data if there's a difference between
+# the gathered facts and our desired configuration in the vars.
+- name: Update FAD SLB Content Routing entry if entry exists and needs update.
+  vars:
+    current_route_facts: "{{ route_regather_results.json.payload }}"
+    query: "[?mkey=='%s'].%s | [0]"
+  ansible.builtin.uri:
+    method: PUT
+    url: "{{ fad_api_endpoint.slb_content_routing }}&mkey={{ route.name }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    body: |
+      {
+        "comments": "{{ route.comments | default('') | string }}",
+        "connection-pool": "{{ route.connection_pool | default('') | string }}",
+        "connection_pool_inherit": "{{ route.connection_pool_inherit | default('enable') | string }}",
+        "ip": "{{ route.ip | default('0.0.0.0') | string }}",
+        "ip6": "{{ route.ip6 | default('::') | string }}",
+        "method": "{{ route.method | default('') | string }}",
+        "method_inherit": "{{ route.method_inherit | default('enable') | string }}",
+        "packet-fwd-method": "{{ route.packet_fwd_method | default('inherit') | string }}",
+        "persistence": "{{ route.persistence | default('') | string }}",
+        "persistence_inherit": "{{ route.persistence_inherit | default('enable') | string }}",
+        "pool": "{{ route.pool | string }}",
+        "schedule-list": "{{ route.schedule_list | default('disable') | string }}",
+        "schedule-pool-list": "{{ route.schedule_pool_list | default('') | string }}",
+        "source-pool-list": "{{ route.source_pool_list | default('') | string }}",
+        "type": "{{ route.type | default('l7-content-routing') | string }}"
+      }
+  register: route_update_results
+  loop: "{{ fad_slb_content_routings }}"
+  loop_control:
+    loop_var: route
+    label: "{{ route.name }}"
+  when: >
+    ((current_route_facts | json_query(query % (route.name, 'comments'))) !=
+      (route.comments | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, '\"connection-pool\"'))) !=
+      (route.connection_pool | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'connection_pool_inherit'))) !=
+      (route.connection_pool_inherit | default('enable') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'ip'))) !=
+      (route.ip | default('0.0.0.0/0') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'ip6'))) !=
+      (route.ip6 | default('::/0') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'method'))) !=
+      (route.method | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'method_inherit'))) !=
+      (route.method_inherit | default('enable') | string)) or
+    ((current_route_facts | json_query(query % (route.name, '\"packet-fwd-method\"'))) !=
+      (route.packet_fwd_method | default('inherit') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'persistence'))) !=
+      (route.persistence | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'persistence_inherit'))) !=
+      (route.persistence_inherit | default('enable') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'pool'))) !=
+      (route.pool | string)) or
+    ((current_route_facts | json_query(query % (route.name, '\"schedule-list\"'))) !=
+      (route.schedule_list | default('disable') | string)) or
+    ((current_route_facts | json_query(query % (route.name, '\"schedule-pool-list\"'))) !=
+      (route.schedule_pool_list | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, '\"source-pool-list\"'))) !=
+      (route.source_pool_list | default('') | string)) or
+    ((current_route_facts | json_query(query % (route.name, 'type'))) !=
+      (route.type | default('l7-content-routing') | string))
+  changed_when: "route_update_results.json.payload == 0"
+  failed_when: "route_update_results.json.payload not in [0, -15]"
+  tags: [put]
+
+# Final re-gather and print out for debugging purpose, will be skipped if you skip 'debug' tag.
+- name: Debug out FAD SLB Content Routing final value after update task.
+  ansible.builtin.debug:
+    msg: >
+      {{ (lookup('url', fad_api_endpoint.slb_content_routing, validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
+  tags: [debug, get]

@@ -1,7 +1,7 @@
 ---
 
 # Gather existing entries facts by using HTTP GET Request against the
-# FAD SLB HTTP Content Routing endpoint, and then register the result into the
+# FAD SLB Content Routing endpoint, and then register the result into the
 # 'fad_slb_content_routing_get_results' var. Failed when the HTTP return code
 # is anything other than 200 or 302.
 - name: Gather FAD SLB Content Routing facts for create task.
@@ -47,7 +47,7 @@
         "ip6": "{{ route.ip6 | default('::') | string }}",
         "method": "{{ route.method | default('') | string }}",
         "method_inherit": "{{ route.method_inherit | default('enable') | string }}",
-        "mkey": "{{ route.name | string }}",
+        "mkey": "{{ route.name | default(route.pool) | string }}",
         "packet-fwd-method": "{{ route.packet_fwd_method | default('inherit') | string }}",
         "persistence": "{{ route.persistence | default('') | string }}",
         "persistence_inherit": "{{ route.persistence_inherit | default('enable') | string }}",
@@ -61,9 +61,8 @@
   loop: "{{ fad_slb_content_routings }}"
   loop_control:
     loop_var: route
-    label: "{{ route.name }}"
-  when: >
-    route.name not in existing_routes
+    label: "{{ route.name | default(route.pool) }}"
+  when: route.name not in existing_routes
   changed_when: "route_create_results.json.payload == 0"
   failed_when: "route_create_results.json.payload not in [0, -15]"
   tags: [post]
@@ -97,7 +96,7 @@
     query: "[?mkey=='%s'].%s | [0]"
   ansible.builtin.uri:
     method: PUT
-    url: "{{ fad_api_endpoint.slb_content_routing }}&mkey={{ route.name }}"
+    url: "{{ fad_api_endpoint.slb_content_routing }}&mkey={{ route.name | default(pool.name) }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"

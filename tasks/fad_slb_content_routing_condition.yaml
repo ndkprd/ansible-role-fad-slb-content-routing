@@ -24,18 +24,6 @@
     msg: "{{ route_condition_gather_results.json.payload }}"
   tags: [debug]
 
-# - name: Debug out create condition.
-  # vars:
-  #   existing_route_conditions: "{{ route_condition_gather_results.json.payload }}"
-  #   query: "[?mkey=='%s'].match[].content | [0]"
-  # ansible.builtin.debug:
-  #   msg: "{{ existing_route_conditions | json_query(query % route.0.name) }}"
-  # loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
-  # loop_control:
-  #   loop_var: cr
-  #   label: "{{  route.1.content }} ) -> {{  route.0.name }}"
-  # tags: [debug]
-
 # This task will check if our desired entries in our vars already exist or not
 # in the previously gathered fact. If yes, then that entry will be skipped.
 # If not exist, that entry will be created.
@@ -146,3 +134,33 @@
     loop_var: route
     label: "{{ route.name }}"
   tags: [debug, get]
+
+# delete task for entries with "state = absent" entries. Will only run if you state
+# "delete_mode = true" var somewhere (pereferably in Playbook or with --extra-vars).
+# the entries MUST NOT be used by other entries to be able to be deleted.
+- name: Delete FAD SLB Content Routing Condition entries with "state = absent".
+  vars:
+    current_route_condition_facts: "{{ route_condition_gather_results_update.json.payload }}"
+    query: "[?mkey=='%s'].match | [0] | [?content=='%s'].%s | [0]"
+  ansible.builtin.uri:
+    method: DELETE
+    url:
+      "{{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name | default(route.0.pool) }}&mkey={{ \
+        (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'mkey'))) }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: route_condition_delete_results
+  loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
+  loop_control:
+    loop_var: route
+    label: "{{ route.1.content }} -> {{ route.0.name | default(route.0.pool) }}"
+  changed_when: "route_condition_delete_results.json.payload == 0"
+  failed_when: "route_condition_delete_results.status not in [200, 302]"
+  when:
+    - delete_mode | default(false)
+    - route.0.state | default('present') == "present"
+    - route.1.state | default('present') == "absent"
+  tags: [delete]

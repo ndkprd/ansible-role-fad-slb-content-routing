@@ -45,7 +45,7 @@
     query: "[?mkey=='%s'].match[].content"
   ansible.builtin.uri:
     method: POST
-    url: "{{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name }}"
+    url: "{{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name | default(route.0.pool) }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"
@@ -63,9 +63,9 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{  route.1.content }} ) -> {{  route.0.name }}"
+    label: "{{  route.1.content }} ) -> {{  route.0.name | default(route.0.pool) }}"
   when: >
-     route.1.content | string not in existing_route_conditions | json_query('[?mkey==`' +  route.0.name + '`].match[].content')
+     route.1.content | string not in existing_route_conditions | json_query('[?mkey==`' +  route.0.name | default(route.0.pool) + '`].match[].content')
   changed_when: "route_condition_create_results.json.payload == 0"
   failed_when: "route_condition_create_results.json.payload not in [0, -15]"
   tags: [post]
@@ -100,7 +100,7 @@
     method: PUT
     url: >
       {{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name }}&mkey={{
-      current_route_condition_facts | json_query(query % (route.0.name, route.1.content,
+      current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content,
       'mkey')) }}
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
@@ -119,19 +119,19 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{ route.1.content }} -> {{ route.0.name }}"
+    label: "{{ route.1.content }} -> {{ route.0.name | default(route.0.pool) }}"
   changed_when: "route_condition_update_results.json.payload == 0"
   failed_when: "route_condition_update_results.json.payload not in [0, -15]"
   when: >
-    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'content')) !=
+    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'content')) !=
       route.1.content | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'ignorecase')) !=
+    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'ignorecase')) !=
       route.1.ignorecase | default('enable') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'object')) !=
+    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'object')) !=
       route.1.object | default('http-host-header') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'reverse')) !=
+    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'reverse')) !=
       route.1.reverse | default('disable') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name, route.1.content, 'type')) !=
+    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'type')) !=
       route.1.type | default('string') | string)
   tags: [put]
 
@@ -139,7 +139,7 @@
 - name: Debug out FAD SLB Content Routing Condition final value after update task.
   ansible.builtin.debug:
     msg: >
-      {{ (lookup('url', fad_api_endpoint.slb_content_routing_condition + '&pkey=' + route.name,
+      {{ (lookup('url', fad_api_endpoint.slb_content_routing_condition + '&pkey=' + route.name | default(route.pool),
       validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
   loop: "{{ fad_slb_content_routings }}"
   loop_control:

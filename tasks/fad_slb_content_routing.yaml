@@ -62,7 +62,7 @@
   loop_control:
     loop_var: route
     label: "{{ route.name | default(route.pool) }}"
-  when: route.name not in existing_routes
+  when: route.name | default(route.pool) not in existing_routes
   changed_when: "route_create_results.json.payload == 0"
   failed_when: "route_create_results.json.payload not in [0, -15]"
   tags: [post]
@@ -96,7 +96,7 @@
     query: "[?mkey=='%s'].%s | [0]"
   ansible.builtin.uri:
     method: PUT
-    url: "{{ fad_api_endpoint.slb_content_routing }}&mkey={{ route.name | default(pool.name) }}"
+    url: "{{ fad_api_endpoint.slb_content_routing }}&mkey={{ route.name | default(route.pool) }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"
@@ -124,37 +124,37 @@
   loop: "{{ fad_slb_content_routings }}"
   loop_control:
     loop_var: route
-    label: "{{ route.name }}"
+    label: "{{ route.name | default(route.pool) }}"
   when: >
-    ((current_route_facts | json_query(query % (route.name, 'comments'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'comments'))) !=
       (route.comments | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, '\"connection-pool\"'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), '\"connection-pool\"'))) !=
       (route.connection_pool | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'connection_pool_inherit'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'connection_pool_inherit'))) !=
       (route.connection_pool_inherit | default('enable') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'ip'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'ip'))) !=
       (route.ip | default('0.0.0.0/0') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'ip6'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'ip6'))) !=
       (route.ip6 | default('::/0') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'method'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'method'))) !=
       (route.method | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'method_inherit'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'method_inherit'))) !=
       (route.method_inherit | default('enable') | string)) or
-    ((current_route_facts | json_query(query % (route.name, '\"packet-fwd-method\"'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), '\"packet-fwd-method\"'))) !=
       (route.packet_fwd_method | default('inherit') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'persistence'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'persistence'))) !=
       (route.persistence | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'persistence_inherit'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'persistence_inherit'))) !=
       (route.persistence_inherit | default('enable') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'pool'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'pool'))) !=
       (route.pool | string)) or
-    ((current_route_facts | json_query(query % (route.name, '\"schedule-list\"'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), '\"schedule-list\"'))) !=
       (route.schedule_list | default('disable') | string)) or
-    ((current_route_facts | json_query(query % (route.name, '\"schedule-pool-list\"'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), '\"schedule-pool-list\"'))) !=
       (route.schedule_pool_list | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, '\"source-pool-list\"'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), '\"source-pool-list\"'))) !=
       (route.source_pool_list | default('') | string)) or
-    ((current_route_facts | json_query(query % (route.name, 'type'))) !=
+    ((current_route_facts | json_query(query % (route.name | default(route.pool), 'type'))) !=
       (route.type | default('l7-content-routing') | string))
   changed_when: "route_update_results.json.payload == 0"
   failed_when: "route_update_results.json.payload not in [0, -15]"

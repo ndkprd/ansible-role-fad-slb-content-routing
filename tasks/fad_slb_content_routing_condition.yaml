@@ -41,7 +41,7 @@
     headers: "{{ fad_api_header }}"
     body: >
       {
-        "content": "{{ route.1.content | string }}",
+        "content": "{{ route.1.content | default(route.0.pool) | string }}",
         "ignorecase": "{{ route.1.ignorecase | default('enable') | string }}",
         "object": "{{ route.1.object | default('http-host-header') | string }}",
         "reverse": "{{ route.1.reverse | default('disable') | string }}",
@@ -51,9 +51,11 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{  route.1.content }} ) -> {{  route.0.name | default(route.0.pool) }}"
-  when: >
-     route.1.content | string not in existing_route_conditions | json_query('[?mkey==`' +  route.0.name | default(route.0.pool) + '`].match[].content')
+    label: "{{  route.1.content | default(route.0.pool) }} ) -> {{  route.0.name | default(route.0.pool) }}"
+  when:
+    - route.0.state | default('present') == "present"
+    - route.1.state | default('present') == "present"
+    - route.1.content | default(route.0.pool) | string not in existing_route_conditions | json_query(query % (route.1.content | default(route.0.pool) | string))
   changed_when: "route_condition_create_results.json.payload == 0"
   failed_when: "route_condition_create_results.json.payload not in [0, -15]"
   tags: [post]
@@ -88,7 +90,7 @@
     method: PUT
     url: >
       {{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name }}&mkey={{
-      current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content,
+      current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool),
       'mkey')) }}
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
@@ -97,7 +99,7 @@
     headers: "{{ fad_api_header }}"
     body: >
       {
-        "content": "{{ route.1.content | string }}",
+        "content": "{{ route.1.content | default(route.0.pool) | string }}",
         "ignorecase": "{{ route.1.ignorecase | default('enable') | string }}",
         "object": "{{ route.1.object | default('http-host-header') | string }}",
         "reverse": "{{ route.1.reverse | default('disable') | string }}",
@@ -107,20 +109,24 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{ route.1.content }} -> {{ route.0.name | default(route.0.pool) }}"
+    label: "{{ route.1.content | default(route.0.pool) }} -> {{ route.0.name | default(route.0.pool) }}"
   changed_when: "route_condition_update_results.json.payload == 0"
   failed_when: "route_condition_update_results.json.payload not in [0, -15]"
   when: >
-    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'content')) !=
-      route.1.content | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'ignorecase')) !=
-      route.1.ignorecase | default('enable') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'object')) !=
-      route.1.object | default('http-host-header') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'reverse')) !=
-      route.1.reverse | default('disable') | string) or
-    (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'type')) !=
-      route.1.type | default('string') | string)
+    (route.0.state | default('present') == "present") and
+    (route.1.state | default('present') == "present") and
+    (
+      (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'content')) !=
+        route.1.content | default(route.0.pool) | string) or
+      (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'ignorecase')) !=
+        route.1.ignorecase | default('enable') | string) or
+      (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'object')) !=
+        route.1.object | default('http-host-header') | string) or
+      (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'reverse')) !=
+        route.1.reverse | default('disable') | string) or
+      (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'type')) !=
+        route.1.type | default('string') | string)
+    )
   tags: [put]
 
 # Final re-gather and print out for debugging purpose, will be skipped if you skip 'debug' tag.
@@ -146,7 +152,7 @@
     method: DELETE
     url:
       "{{ fad_api_endpoint.slb_content_routing_condition }}&pkey={{ route.0.name | default(route.0.pool) }}&mkey={{ \
-        (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content, 'mkey'))) }}"
+        (current_route_condition_facts | json_query(query % (route.0.name | default(route.0.pool), route.1.content | default(route.0.pool), 'mkey'))) }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"
@@ -156,7 +162,7 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{ route.1.content }} -> {{ route.0.name | default(route.0.pool) }}"
+    label: "{{ route.1.content | default(route.0.pool) }} -> {{ route.0.name | default(route.0.pool) }}"
   changed_when: "route_condition_delete_results.json.payload == 0"
   failed_when: "route_condition_delete_results.status not in [200, 302]"
   when:

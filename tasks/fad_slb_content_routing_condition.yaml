@@ -138,7 +138,7 @@
   loop: "{{ fad_slb_content_routings }}"
   loop_control:
     loop_var: route
-    label: "{{ route.name }}"
+    label: "{{ route.name | default(route.pool) }}"
   tags: [debug, get]
 
 # delete task for entries with "state = absent" entries. Will only run if you state

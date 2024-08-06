@@ -51,7 +51,7 @@
   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
   loop_control:
     loop_var: route
-    label: "{{  route.1.content | default(route.0.pool) }} ) -> {{  route.0.name | default(route.0.pool) }}"
+    label: "{{  route.1.content | default(route.0.pool) }} -> {{  route.0.name | default(route.0.pool) }}"
   when:
     - route.0.state | default('present') == "present"
     - route.1.state | default('present') == "present"

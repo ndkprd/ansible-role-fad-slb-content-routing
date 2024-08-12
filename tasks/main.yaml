@@ -5,10 +5,13 @@
 
 # will invoke tasks inside the file named 'fad_slb_content_routing.yaml'
 - name: Create/update SLB HTTP Content Routing entries.
-  tags: [fad_slb_content_routing]
   ansible.builtin.import_tasks: fad_slb_content_routing.yaml
+  tags:
+    - fad_slb_content_routing
 
 # will invoke tasks inside the file named 'fad_slb_content_routing_condition.yaml'
 - name: Create/update SLB HTTP Content Routing Member entries.
-  tags: [fad_slb_content_routing_condition]
   ansible.builtin.import_tasks: fad_slb_content_routing_condition.yaml
+  tags:
+    - fad_slb_content_routing
+    - fad_slb_content_routing_condition

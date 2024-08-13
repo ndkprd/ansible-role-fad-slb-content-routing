@@ -24,6 +24,17 @@
     msg: "{{ route_condition_gather_results.json.payload }}"
   tags: [debug]
 
+# - name: Debug out existing SLB Content Routing Condition content.
+#   vars:
+#     existing_route_conditions: "{{ route_condition_gather_results.json.payload }}"
+#     query: "[?mkey=='%s'].match[].content"
+#   ansible.builtin.debug:
+#     msg: "{{ existing_route_conditions | json_query(query % (route.0.name | default(route.0.pool))) | string }}"
+#   loop: "{{ fad_slb_content_routings | subelements('conditions') }}"
+#   loop_control:
+#     loop_var: route
+#     label: "{{  route.1.content | default(route.0.pool) }} -> {{  route.0.name | default(route.0.pool) }}"
+
 # This task will check if our desired entries in our vars already exist or not
 # in the previously gathered fact. If yes, then that entry will be skipped.
 # If not exist, that entry will be created.
@@ -55,7 +66,7 @@
   when:
     - route.0.state | default('present') == "present"
     - route.1.state | default('present') == "present"
-    - route.1.content | default(route.0.pool) | string not in existing_route_conditions | json_query(query % (route.1.content | default(route.0.pool) | string))
+    - route.1.content | default(route.0.pool) | string not in existing_route_conditions | json_query(query % (route.0.name | default(route.0.pool)) | string)
   changed_when: "route_condition_create_results.json.payload == 0"
   failed_when: "route_condition_create_results.json.payload not in [0, -15]"
   tags: [post]
